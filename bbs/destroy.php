@@ -1,6 +1,6 @@
 <?php
     // コントローラー(C)
-    require_once 'User.php';
+    require_once 'models/User.php';
     session_start();
    
     $id = $_POST['id'];

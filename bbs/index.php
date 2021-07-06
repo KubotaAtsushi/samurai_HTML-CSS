@@ -1,7 +1,7 @@
 <?php
     // コントローラ(C)
     // 外部ファイルの読み込み
-    require_once 'User.php';
+    require_once 'models/User.php';
     // セッション開始
     session_start();
     
@@ -10,4 +10,4 @@
     // セッションからメッセージを削除
     $_SESSION['flash_message'] = null;
     // HTMLファイル表示
-    include_once 'index_view.php';
+    include_once 'views/index_view.php';
