@@ -1,48 +1,43 @@
 <?php
     // モデル(M)
-    require_once 'models/Comment.php';
-    require_once 'models/User.php';
     require_once 'models/Model.php';
 
-    // 投稿の設計図を作成
-    class Post extends Model{
+    // いいねの設計図を作成
+    class Favorite extends Model{
         // プロパティ
-        public $id; // 投稿番号
-        public $user_id; //投稿者のユーザー番号
-        public $title; // タイトル
-        public $content; // 本文
-        public $image; // 画像ファイル名
-        public $created_at; // 投稿日時
+        public $id; // いいね番号
+        public $user_id; // いいねをした者のユーザー番号
+        public $post_id; // 投稿番号
+        public $created_at; // いいねをした日時
         // コンストラクタ
-        public function __construct($user_id="", $title="", $content="", $image=""){
+        public function __construct($user_id="", $post_id=""){
             $this->user_id = $user_id;
-            $this->title = $title;
-            $this->content = $content;
-            $this->image = $image;
+            $this->post_id = $post_id;
         }
         
         // 入力チェックをするメソッド
         public function validate(){
             // 空のエラー配列作成
             $errors = array();
-            // タイトルが入力されていなければ
-            if($this->title === ''){
-                $errors[] = 'タイトルが入力されていません';
-            }
-            // 本文が入力されていなければ
+            // 内容が入力されていなければ
             if($this->content === ''){
-                $errors[] = '本文を入力してください';
+                $errors[] = '内容が入力されていません';
+            }
+            // ユーザーidが入力されていなければ
+            if($this->user_id === '' || $this->user_id === null){
+                $errors[] = 'ユーザーIDを入力してください';
             }
             
-            // 画像が選択されていなければ
-            if($this->image === ''){
-                $errors[] = '画像を選択してください';
+            // 投稿idが入力されていなければ
+            if($this->post_id === '' || $this->post_id === null){
+                $errors[] = '投稿idを入力してください';
             }
             
             // 完成したエラー配列はいあげる
             return $errors;
         }
-      
+          
+        
         // 全テーブル情報を取得するメソッド
         public static function all(){
             try {
@@ -64,13 +59,10 @@
                 $pdo = self::get_connection();
                 
                 if($this->id === null){
-                $stmt = $pdo -> prepare("INSERT INTO posts (user_id, title, content, image) VALUES (:user_id, :title, :content, :image)");
+                $stmt = $pdo -> prepare("INSERT INTO favorites (user_id, post_id) VALUES (:user_id, :post_id)");
                 // バインド処理
                 $stmt->bindParam(':user_id', $this->user_id, PDO::PARAM_INT);
-                $stmt->bindParam(':title', $this->title, PDO::PARAM_STR);
-                $stmt->bindParam(':content', $this->content, PDO::PARAM_STR);
-                $stmt->bindParam(':image', $this->image, PDO::PARAM_STR);
-
+                $stmt->bindParam(':post_id', $this->post_id, PDO::PARAM_INT);
                 // 実行
                 $stmt->execute();
                     
@@ -87,7 +79,7 @@
                 
                 self::close_connection($pdo, $stmp);
                 if($this->id === null){
-                    return "新規写真投稿が成功しました。";
+                    return "いいねが成功しました。";
                 }else{
                     return $this->id. 'の投稿情報を更新しました';
                 }
@@ -96,32 +88,39 @@
                 return 'PDO exception: ' . $e->getMessage();
             }
         }
-        public static function find($id){
+        public static function find($user_id, $post_id){
                 try {
                 $pdo = self::get_connection();
-                $stmt = $pdo -> prepare("SELECT posts.user_id, posts.id, posts.title, posts.content, posts.image, posts.created_at, users.name FROM posts JOIN users ON posts.user_id = users.id WHERE posts.id=:id");
+                $stmt = $pdo -> prepare("SELECT * FROM favorites WHERE user_id=:user_id AND post_id=:post_id");
                 // バインド処理
-                $stmt->bindParam(':id', $id, PDO::PARAM_INT);                // 実行
+                $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                $stmt->bindParam(':post_id', $post_id, PDO::PARAM_INT);                // 実行
+                // 実行
                 $stmt->execute();
                 // フェッチの結果を、Postクラスのインスタンスにマッピングする
-                $stmt->setFetchMode(PDO::FETCH_CLASS|PDO::FETCH_PROPS_LATE, 'Post');
-                $post = $stmt->fetch();
+                $stmt->setFetchMode(PDO::FETCH_CLASS|PDO::FETCH_PROPS_LATE, 'Favorite');
+                $favorite = $stmt->fetch();
                 self::close_connection($pdo, $stmp);
-                return $post;
+                if($favorite !== false){
+                    return true;
+                }else{
+                    return false;
+                }
                 
             } catch (PDOException $e) {
                 return 'PDO exception: ' . $e->getMessage();
             }
         }
         
-        public static function destroy($id){
+        public static function destroy($user_id, $post_id){
             try {
                 $pdo = self::get_connection();
-                $stmt = $pdo -> prepare("DELETE FROM posts WHERE id=:id");
+                $stmt = $pdo -> prepare("DELETE FROM favorites WHERE user_id=:user_id AND post_id=:post_id");
                 // バインド処理
-                $stmt->bindParam(':id', $id, PDO::PARAM_INT);                // 実行
+                $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                $stmt->bindParam(':post_id', $post_id, PDO::PARAM_INT);
+                // 実行
                 $stmt->execute();
-               
                 } catch (PDOException $e) {
                     return 'PDO exception: ' . $e->getMessage();
             }
@@ -147,40 +146,5 @@
                 } catch (PDOException $e) {
                     return 'PDO exception: ' . $e->getMessage();
                 }
-        }
-        // その投稿に紐づいたコメント一覧を取得
-        public function comments(){
-             try {
-                $pdo = self::get_connection();
-                $stmt = $pdo -> prepare("select comments.id, users.name, comments.content, comments.created_at from comments join users on comments.user_id = users.id where post_id=:post_id");
-                // バインド処理
-                $stmt->bindParam(':post_id', $this->id, PDO::PARAM_INT);                // 実行
-                $stmt->execute();
-                // フェッチの結果を、Commentクラスのインスタンスにマッピングする
-                $stmt->setFetchMode(PDO::FETCH_CLASS|PDO::FETCH_PROPS_LATE, 'Comment');
-                $comments = $stmt->fetchAll();
-                self::close_connection($pdo, $stmp);
-                return $comments;
-                
-            } catch (PDOException $e) {
-                return 'PDO exception: ' . $e->getMessage();
-            }
-        }
-        public function favorites(){
-            try {
-                $pdo = self::get_connection();
-                $stmt = $pdo -> prepare("select users.id, users.name from favorites JOIN users ON favorites.user_id = users.id WHERE favorites.post_id=:post_id");
-                // バインド処理
-                $stmt->bindParam(':post_id', $this->id, PDO::PARAM_INT);                // 実行
-                $stmt->execute();
-                // フェッチの結果を、Userクラスのインスタンスにマッピングする
-                $stmt->setFetchMode(PDO::FETCH_CLASS|PDO::FETCH_PROPS_LATE, 'User');
-                $favorites_users = $stmt->fetchAll();
-                self::close_connection($pdo, $stmp);
-                return $favorites_users;
-                
-            } catch (PDOException $e) {
-                return 'PDO exception: ' . $e->getMessage();
-            }
         }
     }
